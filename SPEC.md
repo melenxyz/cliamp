@@ -1,0 +1,199 @@
+# cliamp custom SoundCloud provider: spec
+
+Status: draft · Started 2026-11-04 · Based on cliamp `02309c9` (2026-10-22, v2.3.0)
+
+## Goal
+
+A SoundCloud provider for cliamp that streams like the current one but keeps
+what it plays, so music becomes available offline over time.
+
+Every track lives in one of three states:
+
+| State | How it got there | Evicted automatically? |
+|---|---|---|
+| **Remote** | Never played or downloaded | n/a |
+| **Cached** | Played once (streamed and saved at the same time) | Yes, least recently played first, when the cache is over its size limit |
+| **Pinned** | Part of a sync rule (my Likes, all of artist X) or pinned by hand | Never, and doesn't count toward the cache limit |
+
+## Features
+
+### 1. Stream and save at the same time
+- The first play of a track starts playback right away and writes the file to
+  disk while it plays.
+- If playback finishes (or the download finishes in the background), the file
+  is committed to the cache.
+- **If I skip early, keep the partial download and resume it later.** The next
+  play (or a sync job) continues from where it stopped instead of starting over.
+  Partials are only thrown away if resuming fails (see below).
+- Later plays come from the local file: instant start, seekable, works offline.
+
+#### Resume: tested 2026-11-04 (yt-dlp 2026.10.26)
+- SoundCloud now serves **HLS only** (`hls_aac_96k`, `hls_aac_160k` m4a; the
+  original upload format needs a signed-in account). No progressive MP3.
+- yt-dlp downloads HLS in fragments (22 for a 3:34 track) and leaves three files
+  when interrupted:
+  - `<name>.part`: the fragments finished so far, concatenated
+  - `<name>.ytdl`: resume state, e.g. `{"downloader": {"current_fragment": {"index": 3}}}`
+  - `<name>.part-FragN.part`: the fragment that was in progress
+- Running the same command again **resumes at that fragment** (log showed
+  `frag 3/22` at 18%) and produced a valid file (ffprobe: 213.9 s).
+- **Catch:** a leftover `-FragN.part` caused `HTTP Error 416: Requested Range
+  Not Satisfiable` retries in one run. Rule: **delete `*-Frag*.part` before
+  resuming** and keep `.part` + `.ytdl`. That loses at most one fragment (~10 s
+  of audio).
+- **Discard rule:** if a resume fails (yt-dlp error, or the stream's fragment
+  list changed), delete `.part`, `.ytdl` and fragments, and start fresh next time.
+- Partials count toward `cache_max` and are evicted like cached tracks.
+- An interrupted HLS download stops mid-way through its fragments, so the
+  stream URLs can expire. yt-dlp re-extracts on resume, which worked in the test.
+
+### 2. Pinned downloads (sync rules)
+- Rules are set in config, e.g.:
+  ```toml
+  [soundcloud_custom]
+  user = "yourname"
+  cookies_from = "firefox"
+  cache_max = "20GB"
+
+  [[soundcloud_custom.sync]]
+  source = "likes"            # my likes
+
+  [[soundcloud_custom.sync]]
+  source = "artist:forss"     # everything forss uploaded
+  ```
+- A sync job fetches each rule's track list and downloads anything missing.
+  Already-downloaded tracks are skipped (yt-dlp `--download-archive` style).
+- When a cached track becomes pinned, it moves to the pinned store; nothing is
+  downloaded again.
+- Pin or unpin a single track by hand from the UI (key binding TBD).
+- **Pin sources are generic.** A track is pinned while _at least one_ source
+  holds it. Sources so far: my likes, an artist's uploads, a manual pin. More
+  later (a playlist/set, reposts, ...). Each track records which sources hold it.
+- **When the last source lets go** (I unlike it, remove the artist rule, unpin
+  it by hand, the artist deletes the track), the file is **demoted to the
+  cache**, not deleted. It then follows normal cache eviction, and its
+  last-played time stays as it was.
+- Demoting moves the file from `pinned/` to `cache/` (a rename on the same
+  filesystem, so no copy).
+
+### 3. Cache with a size limit
+- `cache_max` limits the cache only. Pinned files are never counted or evicted.
+- Eviction is least recently **played** first, and runs after each new cache
+  write.
+- Cache stats visible somewhere (size used / limit, number of tracks).
+
+### 4. Browse
+- **Likes** for my user (already in the upstream provider).
+- **Artists**: a list of artists from config, each opening that artist's tracks.
+- **Offline**: everything on disk (cached + pinned), playable with no network.
+- A per-track marker in the list: pinned / cached / remote.
+- Search (`Ctrl+F`) works as in upstream.
+
+### 5. Offline behaviour
+- No network: lists come from the local index, and only on-disk tracks play.
+- Remote tracks in an offline list are shown greyed out or skipped.
+
+## How it fits into cliamp
+
+What I found reading the source:
+
+- Providers are **compiled Go packages** in `external/<name>/`. Lua plugins can
+  only be `hook` or `visualizer` plugins, so this has to be a **fork of
+  cliamp** (or an upstream PR), not a plugin.
+- The upstream provider is tiny (`external/soundcloud/provider.go`, ~100 lines).
+  It lists `soundcloud.com/<user>/{tracks,likes,reposts}` and hands everything
+  to yt-dlp through `resolve.ResolveYTDLBatch`.
+- Playback of yt-dlp tracks today: `player/ytdl.go` runs `yt-dlp -o -` piped
+  into `ffmpeg`, which outputs PCM. Nothing is written to disk and seeking is
+  limited.
+- **The hook we need:** `provider.CustomStreamer` (`provider/interfaces.go`).
+  A provider declares its own URI scheme (e.g. `sccache:<track-id>`) and returns
+  its own `beep.StreamSeekCloser`. Spotify uses this
+  (`external/spotify/streamer.go`). The whole stream-and-save logic can live
+  inside the provider without patching the player.
+- `tracksave/` already downloads a yt-dlp track to `~/Music/cliamp` (the
+  "save track" feature). That's the starting point for the downloader.
+- `provider.PlaybackStateReporter` can draw a marker column per row with no
+  I/O. That could be how the pinned/cached/remote marker gets shown.
+- The player's decode helpers are not exported, so the provider either runs
+  its own ffmpeg-to-PCM pipeline (like Spotify does) or we export a small
+  helper from `player/`.
+
+### Stream-while-downloading: candidate designs
+
+**A. Tee in the provider (preferred)**
+`yt-dlp -o <cache>/<id>.part` writes the file. Our streamer reads the growing
+`.part` file, waiting at EOF while yt-dlp is still running, and feeds ffmpeg.
+When yt-dlp exits successfully, rename `.part` to the final name. One network
+fetch, and seeking is possible inside the part already downloaded.
+
+**B. Tee the pipe**
+`yt-dlp -o -` → `io.TeeReader` → (ffmpeg, file). Simpler, but only works for
+formats yt-dlp can write to stdout, and the saved file may need remuxing.
+
+**C. Download first, then play**
+Start the download and play the local file once enough is buffered. Easiest,
+but adds start-up delay.
+
+Format check done: SoundCloud is HLS-only (fragmented m4a), so yt-dlp's
+`.part` file grows one fragment at a time. To verify for design A: ffmpeg can
+decode a growing fragmented-m4a `.part` file sequentially, and the final
+renamed `.m4a` is seekable (needs testing; yt-dlp may run a fixup step at the
+end).
+
+## Storage layout (draft)
+
+```
+~/Music/soundcloud/            # or configurable
+  pinned/<artist>/<title> [<id>].<ext>
+  cache/<id>.<ext>
+  partial/<id>.m4a.part        # + .ytdl resume state; counts as cache
+  index.db                     # or index.toml/json: id, title, artist, duration,
+                               # state, size, last_played, pin sources
+```
+
+Pinned files get readable names so they're usable outside cliamp. Cache files
+are keyed by ID because they're cliamp-internal.
+
+## Repo / workflow plan
+
+- [ ] Fork `bjarneo/cliamp` and clone it into this folder.
+- [ ] Decide: new provider (`external/soundcloudx/`) beside the upstream one,
+      or extend `external/soundcloud/` (better chance of an upstream PR).
+- [ ] Build locally with `make`, and run the fork's binary next to the pacman
+      cliamp (don't replace `/usr/bin/cliamp`).
+- [ ] Keep the fork rebased on upstream.
+
+## Milestones
+
+1. **Artists list**: config `artists = [...]`, an "Artists" section. Small,
+   gets familiar with the codebase.
+2. **Local index + offline list**: index file, an "Offline" playlist of files on disk.
+3. **Stream-and-save**: `CustomStreamer` with design A; cache commit on finish.
+4. **Cache eviction**: `cache_max`, LRU by last played.
+5. **Sync rules**: pinned downloads for likes and artists, run from a CLI
+   command (`cliamp plugins call`?) and/or a systemd timer.
+6. **UI polish**: state markers, pin/unpin key, cache stats.
+
+## Open questions
+
+- Where does sync run: inside cliamp (background job), as a separate CLI or
+  timer, or both? --mélen added: inside cliamp
+- Audio format: keep whatever SoundCloud serves, or always remux/convert to one
+  format? 
+- Reposts and playlists/sets: in scope for sync rules?
+- Is the plan to send this upstream as a PR, or keep it as a private fork? --mélen added: private fork
+
+## Decisions
+
+- **2026-11-04: Skipped tracks** keep their partial download and resume later.
+  Partials are discarded only when a resume fails. Resume was tested and works
+  (see feature 1).
+- **2026-11-04: Leaving pinning:** when no pin source holds a track any more,
+  its file is demoted to the cache, not deleted.
+
+## Notes
+
+- Requires `yt-dlp` (installed via mise, kept current by `omarchy update`) and
+  `ffmpeg`.
+- Downloads are for personal offline listening only.
