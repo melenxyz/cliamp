@@ -1,6 +1,6 @@
 # cliamp custom SoundCloud provider: spec
 
-Status: draft · Started 2026-11-04 · Based on cliamp `02309c9` (2026-10-22, v2.3.0)
+Status: milestones 1–6 implemented in `external/soundcloudx/` (2026-11-04) · Started 2026-11-04 · Based on cliamp `02309c9` (2026-10-22, v2.3.0)
 
 ## Goal
 
@@ -157,14 +157,18 @@ are keyed by ID because they're cliamp-internal.
 
 ## Repo / workflow plan
 
-- [ ] Fork `bjarneo/cliamp` and clone it into this folder.
-- [ ] Decide: new provider (`external/soundcloudx/`) beside the upstream one,
+- [x] Fork `bjarneo/cliamp` and clone it into this folder.
+- [x] Decide: new provider (`external/soundcloudx/`) beside the upstream one,
       or extend `external/soundcloud/` (better chance of an upstream PR).
-- [ ] Build locally with `make`, and run the fork's binary next to the pacman
+      → new provider (private fork, fewer rebase conflicts).
+- [x] Build locally with `make`, and run the fork's binary next to the pacman
       cliamp (don't replace `/usr/bin/cliamp`).
 - [ ] Keep the fork rebased on upstream.
 
 ## Milestones
+
+All six are implemented. Config reference: `docs/configuration.md`, section
+"SoundCloud+ (offline cache)".
 
 1. **Artists list**: config `artists = [...]`, an "Artists" section. Small,
    gets familiar with the codebase.
@@ -178,9 +182,10 @@ are keyed by ID because they're cliamp-internal.
 ## Open questions
 
 - Where does sync run: inside cliamp (background job), as a separate CLI or
-  timer, or both? --mélen added: inside cliamp
+  timer, or both? --mélen added: inside cliamp → done: 15 s after start, every
+  `sync_interval`, and on `Ctrl+R`.
 - Audio format: keep whatever SoundCloud serves, or always remux/convert to one
-  format? 
+  format? → kept as served (`hls_aac_160k` m4a, remuxed by yt-dlp's FixupM4a).
 - Reposts and playlists/sets: in scope for sync rules?
 - Is the plan to send this upstream as a PR, or keep it as a private fork? --mélen added: private fork
 
@@ -191,6 +196,31 @@ are keyed by ID because they're cliamp-internal.
   (see feature 1).
 - **2026-11-04: Leaving pinning:** when no pin source holds a track any more,
   its file is demoted to the cache, not deleted.
+- **2026-11-04: Package and config name:** `external/soundcloudx/`, provider
+  key `soundcloudx` (alias `scx`), config section `[soundcloudx]`, display
+  name "SoundCloud+". Not `soundcloud_custom`: the config golden test and the
+  docs tests only accept `[a-z]+` section and provider names.
+- **2026-11-04: Sync rules are a list,** `sync = ["likes", "artist:forss"]`,
+  not `[[soundcloudx.sync]]` tables: cliamp's hand-written config parser has
+  no arrays of tables. `artists = [...]` lists the Artists section.
+- **2026-11-04: Manual pin = ♥ favorite.** The provider implements
+  `provider.TrackFavoriter`, so favoriting a track pins it and removing the
+  favorite unpins it. No new key binding.
+- **2026-11-04: Stream-and-save is design A,** verified: ffmpeg decodes the
+  growing fragmented-MP4 `.part` file fed through stdin by a tail reader, and
+  the decoder keeps its file handle across yt-dlp's rename and fixup. The
+  provider runs its own ffmpeg (no `player/` changes).
+- **2026-11-04: Seeking during a download** is allowed inside the part already
+  downloaded (estimated at 160 kbps); after the download is committed, seeks
+  use the final file.
+- **2026-11-04: Markers:** `●` pinned, `○` cached, `◐` partial. Upstream's
+  `PlaybackState` gained an optional `Marker` field (small patch in
+  `provider/interfaces.go`, `ui/model/view.go`, `ui/model/inline_overlays.go`).
+- **2026-11-04: Index** is `index.json` in the storage root (no new
+  dependency), written atomically on every change. It also keeps the last
+  listing of each list, for offline browsing.
+- **2026-11-04: Gapless preload** of the next track starts its download too,
+  so the next track is usually on disk before it plays.
 
 ## Notes
 

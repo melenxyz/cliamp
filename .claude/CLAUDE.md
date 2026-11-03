@@ -6,6 +6,14 @@ This is a **private fork** of `bjarneo/cliamp`. The root `CLAUDE.md` (and `AGENT
 
 ## What the fork is for
 
+The fork's provider lives in `external/soundcloudx/` (config `[soundcloudx]`, display name "SoundCloud+"). How the pieces fit:
+
+- `store.go`: `index.json` plus the state machine (remote → partial → cached → pinned), pin sources, demotion, LRU eviction. Every other piece goes through it.
+- `download.go`: one yt-dlp job per track, shared by playback and sync. A job that only streamers want is cancelled when the last streamer closes, which leaves the partial download in place to resume later.
+- `streamer.go` + `tail.go`: the `CustomStreamer`. It runs its own ffmpeg on either the committed file or the growing `.part` file (fed through a tail reader), and seeks by restarting ffmpeg.
+- `sync.go`: the sync rules. A listing that fails changes nothing, so a network error never demotes a track.
+- Upstream patches are kept small: registration in `providers.go`, the config section in `config/config.go`, and `PlaybackState.Marker` in `provider/interfaces.go` plus the two marker renderers in `ui/model/`. `SPEC.md` → Decisions explains each one.
+
 `SPEC.md` is the source of truth: a SoundCloud provider that streams like upstream's `external/soundcloud/` but saves what it plays, so tracks move between three states: **remote → cached (LRU-evicted, `cache_max`) → pinned (sync rules, never evicted)**. Read `SPEC.md` before starting any work on the provider, and record new decisions in its **Decisions** section with a date.
 
 Key points from the spec that take reading several files to work out:
@@ -25,11 +33,15 @@ Both binaries read `~/.config/cliamp/` and use the same IPC socket there, so the
 
 Go isn't on the global PATH on this machine. It comes from the `mise.toml` pin, so prefix every `go`/`make` command with `mise exec --`.
 
-Run a single test: `mise exec -- go test ./external/soundcloud/ -run TestName -v`
+Run a single test: `mise exec -- go test ./external/soundcloudx/ -run TestName -v`
+
+The provider's own tests use a fake yt-dlp script and the real ffmpeg. `SOUNDCLOUDX_LIVE=1 mise exec -- go test -run Live -v ./external/soundcloudx/` runs the whole flow against soundcloud.com (needs network).
+
+To try the binary headless without touching `~/.config/cliamp`, run it with `HOME` and `XDG_*` set to a short temp directory (the IPC socket path must be under 108 bytes, so the scratchpad is too deep), then drive it with `./cliamp remote call --wait --params '{"provider":"soundcloudx",...}' provider.load`. Stop it by PID: `pkill -f` matches its own shell.
 
 ## Tests that a new provider or config key can trip
 
-- `config/config_golden_test.go` loads every setting in `config.toml.example`, and `docs_providers_test.go` / `docs_links_test.go` check provider lists and anchors in `docs/` and `README.md`. A new `[soundcloud_custom]`-style section or a provider registered in `providers.go` will likely need matching entries there for `make test` to pass.
+- `config/config_golden_test.go` loads every setting in `config.toml.example`, and `docs_providers_test.go` / `docs_links_test.go` check provider lists and anchors in `docs/` and `README.md`. A new `[soundcloudx]`-style section or a provider registered in `providers.go` will likely need matching entries there for `make test` to pass.
 - Upstream's rule to keep `docs/` and `site/index.html` in sync matters less for a private fork, but the tests still read both files.
 
 ## Git remotes
