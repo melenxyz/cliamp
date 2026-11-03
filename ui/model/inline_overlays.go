@@ -319,6 +319,8 @@ func (m Model) queueRow(t playlist.Track, idx, numWidth int, reporters []provide
 		stateMarker, stateStyle = "!", playlistUnavailableStyle
 	} else if state, ok := playbackStateFrom(reporters, t); ok {
 		switch {
+		case state.Marker != "":
+			stateMarker, stateStyle = providerMarker(state)
 		case state.Played:
 			stateMarker, stateStyle = playedMarker, activeToggle
 		case state.Position > 0:

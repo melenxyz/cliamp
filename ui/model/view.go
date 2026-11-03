@@ -39,6 +39,15 @@ const (
 	partialMarker = "\u25D1\uFE0E"
 )
 
+// providerMarker returns a provider's own state marker and its style:
+// highlighted when the state counts as played, dim otherwise.
+func providerMarker(state provider.PlaybackState) (string, lipgloss.Style) {
+	if state.Played {
+		return state.Marker, activeToggle
+	}
+	return state.Marker, dimStyle
+}
+
 // Seek-bar glyphs. Played cells are heavy and the unplayed remainder light, so
 // the two differ in weight and not only in color, and a round head marks the
 // position outright instead of leaving it to the boundary between them.
@@ -1249,6 +1258,8 @@ func (m Model) renderPlaylist() string {
 			mark, markStyle := " ", dimStyle
 			if state, ok := playbackStateFrom(stateReporters, t); ok {
 				switch {
+				case state.Marker != "":
+					mark, markStyle = providerMarker(state)
 				case state.Played:
 					mark, markStyle = playedMarker, activeToggle
 				case state.Position > 0:

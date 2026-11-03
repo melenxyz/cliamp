@@ -202,6 +202,10 @@ type PlaybackState struct {
 	Played bool
 	// Position is where the listener stopped. It is zero for a played track.
 	Position time.Duration
+	// Marker, when set, replaces the played or in-progress marker, so a
+	// provider can show its own per-track state (e.g. pinned or cached).
+	// Played picks the highlighted style for it.
+	Marker string
 }
 
 // PlaybackStateReporter is implemented by providers that keep listening state
