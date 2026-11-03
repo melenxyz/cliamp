@@ -60,7 +60,7 @@ eq_preset = "Flat"
 # Saved Custom curve; applied when eq_preset is "Custom" or empty
 eq = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-# Default provider on startup: "cliamp" (the cliamp radio channels), "radio", "podcast", "navidrome", "lyrion", "spotify", "qobuz", "tidal", "bandcamp", "plex", "jellyfin", "emby", "soundcloud", "mixcloud", "netease", "yandex", "audiobookshelf", or a YouTube provider
+# Default provider on startup: "cliamp" (the cliamp radio channels), "radio", "podcast", "navidrome", "lyrion", "spotify", "qobuz", "tidal", "bandcamp", "plex", "jellyfin", "emby", "soundcloud", "soundcloudx", "mixcloud", "netease", "yandex", "audiobookshelf", or a YouTube provider
 # provider = "cliamp"
 
 # Simplified mode: artist/title and time strip without a visualizer or playlist.
@@ -258,6 +258,23 @@ eq = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 # enabled = true
 # user = "yourname"
 # cookies_from = "firefox"   # chrome, brave, edge, opera, safari, vivaldi…
+
+# ---
+# SoundCloud+ (optional; this fork's caching SoundCloud provider)
+# The section header enables it. Every track it plays is saved while it
+# streams, so it plays offline later. cache_max limits the cache of played
+# tracks (least recently played go first). Tracks that a sync rule holds
+# ("likes", or "artist:<name>" for everything an artist uploaded) are pinned:
+# downloaded in the background and never evicted. A ♥ favorite pins one track.
+# sync_interval sets how often the rules run ("off" runs them only on Ctrl+R).
+# [soundcloudx]
+# user = "yourname"
+# cookies_from = "firefox"
+# dir = "~/Music/soundcloud"
+# cache_max = "20GB"
+# artists = ["forss"]
+# sync = ["likes", "artist:forss"]
+# sync_interval = "6h"
 
 # ---
 # Mixcloud (optional, opt-in)

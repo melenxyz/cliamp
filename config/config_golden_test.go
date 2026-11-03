@@ -354,6 +354,16 @@ func TestLoadGolden(t *testing.T) {
 		BrowseSort: "newest",
 	}
 	allWant.SoundCloud = SoundCloudConfig{Enabled: true, User: "yourname", CookiesFrom: "firefox"}
+	allWant.SoundCloudCustom = SoundCloudCustomConfig{
+		Enabled:      true,
+		User:         "yourname",
+		CookiesFrom:  "firefox",
+		Dir:          "~/Music/soundcloud",
+		CacheMax:     "20GB",
+		Artists:      []string{"forss"},
+		Sync:         []string{"likes", "artist:forss"},
+		SyncInterval: "6h",
+	}
 	allWant.Mixcloud = MixcloudConfig{
 		Enabled:        true,
 		Username:       "yourname",

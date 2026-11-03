@@ -515,6 +515,49 @@ func (s *SoundCloudConfig) set(key, val string) {
 	}
 }
 
+// SoundCloudCustomConfig holds settings for the SoundCloud+ provider of this
+// fork (external/soundcloudx), which keeps what it plays on disk. The
+// section header alone enables it; enabled = false turns it off. CacheMax
+// and SyncInterval stay raw strings here; buildProviders parses them.
+// Enable rule: section header.
+type SoundCloudCustomConfig struct {
+	Enabled      bool
+	User         string   // SoundCloud username for Likes, Tracks and Reposts (optional)
+	CookiesFrom  string   // browser name for yt-dlp --cookies-from-browser (optional)
+	Dir          string   // storage root (optional, default ~/Music/soundcloud)
+	CacheMax     string   // cache size limit, e.g. "20GB" (optional, default 10GB)
+	Artists      []string // artists listed in the Artists section
+	Sync         []string // pin rules: "likes", "artist:<name>"
+	SyncInterval string   // e.g. "6h"; "off" runs sync only on Ctrl+R (optional)
+}
+
+// IsSet reports whether the SoundCloud+ provider should be shown.
+func (s SoundCloudCustomConfig) IsSet() bool { return s.Enabled }
+
+// set applies one key of the [soundcloudx] section.
+func (s *SoundCloudCustomConfig) set(key, val string) {
+	switch key {
+	case "enabled":
+		if v, ok := parseBool(val); ok {
+			s.Enabled = v
+		}
+	case "user":
+		s.User = strings.TrimSpace(parseString(val))
+	case "cookies_from":
+		s.CookiesFrom = strings.TrimSpace(parseString(val))
+	case "dir":
+		s.Dir = strings.TrimSpace(parseString(val))
+	case "cache_max":
+		s.CacheMax = strings.TrimSpace(parseString(val))
+	case "artists":
+		s.Artists = parseStringSlice(val)
+	case "sync":
+		s.Sync = parseStringSlice(val)
+	case "sync_interval":
+		s.SyncInterval = strings.TrimSpace(parseString(val))
+	}
+}
+
 // MixcloudConfig holds settings for the Mixcloud provider. Public discovery
 // works with only enabled=true. Username adds public account views; an access
 // token adds /me and Listen Later; browser cookies are used only by yt-dlp for
@@ -795,6 +838,7 @@ type Config struct {
 	Radio            RadioConfig                  // built-in Radio provider settings
 	Podcast          PodcastConfig                // built-in podcast directory settings
 	SoundCloud       SoundCloudConfig             // SoundCloud provider (opt-in via enabled = true)
+	SoundCloudCustom SoundCloudCustomConfig       // SoundCloud+ provider of this fork (section header enables it)
 	Mixcloud         MixcloudConfig               // Mixcloud provider (opt-in via enabled = true)
 	NetEase          NetEaseConfig                // NetEase Cloud Music provider (opt-in via enabled = true)
 	Yandex           YandexConfig                 // Yandex Music provider (opt-in via enabled = true)
@@ -867,6 +911,8 @@ func Load() (Config, error) {
 				cfg.Qobuz.Enabled = true
 			case "tidal":
 				cfg.Tidal.Enabled = true
+			case "soundcloudx":
+				cfg.SoundCloudCustom.Enabled = true
 			}
 			// Initialize plugin sub-maps for [plugins] and [plugins.*] sections.
 			if name, ok := pluginSection(section); ok {
@@ -912,6 +958,8 @@ func Load() (Config, error) {
 			cfg.Podcast.set(key, val)
 		case "soundcloud":
 			cfg.SoundCloud.set(key, val)
+		case "soundcloudx":
+			cfg.SoundCloudCustom.set(key, val)
 		case "mixcloud":
 			cfg.Mixcloud.set(key, val)
 		case "netease":
