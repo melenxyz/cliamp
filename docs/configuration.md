@@ -369,7 +369,7 @@ Each provider section turns on its provider in one of three ways:
 | Rule | Providers | The provider starts when |
 | --- | --- | --- |
 | Credentials | Navidrome, Lyrion, Bandcamp, Plex, Jellyfin, Emby, Audiobookshelf | The section holds the required credentials. Lyrion needs only `url`. Bandcamp needs `user` and `password`; its `url` is optional. |
-| Section | Spotify, Qobuz, Tidal, YouTube Music | The section header exists. Set `enabled = false` to turn the provider off. |
+| Section | Spotify, Qobuz, Tidal, YouTube Music, SoundCloud+ | The section header exists. Set `enabled = false` to turn the provider off. |
 | Opt-in | SoundCloud, Mixcloud, NetEase, Yandex | The section sets `enabled = true`. Yandex also needs `token`. |
 
 Radio and podcasts are always on. Their sections only tune them.
@@ -393,7 +393,7 @@ provider = "cliamp"
 
 The default, `cliamp`, opens on the cliamp radio channels. See [radio.md](radio.md#cliamp-radio).
 
-Valid values: `cliamp` (default), `radio`, `podcast`, `navidrome`, `lyrion`, `plex`, `jellyfin`, `emby`, `spotify`, `qobuz`, `tidal`, `bandcamp`, `soundcloud`, `mixcloud`, `netease`, `yandex`, `audiobookshelf`, `yt`, `youtube`, `ytmusic`. The `--provider` flag also accepts `abs` for `audiobookshelf`.
+Valid values: `cliamp` (default), `radio`, `podcast`, `navidrome`, `lyrion`, `plex`, `jellyfin`, `emby`, `spotify`, `qobuz`, `tidal`, `bandcamp`, `soundcloud`, `soundcloudx`, `mixcloud`, `netease`, `yandex`, `audiobookshelf`, `yt`, `youtube`, `ytmusic`. The `--provider` flag also accepts `abs` for `audiobookshelf` and `scx` for `soundcloudx`.
 
 You can also override this setting on the CLI: `cliamp --provider jellyfin`.
 
@@ -454,6 +454,38 @@ cookies_from = "firefox"   # or chrome, chromium, brave, edge, opera, safari, vi
 With cookies set, yt-dlp can stream subscriber-gated tracks (SoundCloud Go+) and access private likes and playlists that your account can access. The same cookies apply to player yt-dlp calls. Playback uses your signed-in session.
 
 Requires `yt-dlp` on `PATH`.
+
+## SoundCloud+ (offline cache)
+
+SoundCloud+ is this fork's SoundCloud provider. It browses like SoundCloud, but it keeps what it plays, so your music becomes available offline over time. The `[soundcloudx]` header turns it on, and `--provider soundcloudx` opens it at start.
+
+```toml
+[soundcloudx]
+user = "yourname"
+cookies_from = "firefox"
+dir = "~/Music/soundcloud"          # default
+cache_max = "20GB"                  # default 10GB
+artists = ["forss"]
+sync = ["likes", "artist:forss"]
+sync_interval = "6h"                # default; "off" syncs only on Ctrl+R
+```
+
+Every track is in one of three states, shown in the marker column:
+
+| Marker | State | How it got there | Evicted? |
+| --- | --- | --- | --- |
+| (none) | Remote | Never played or downloaded | n/a |
+| `○` | Cached | Played once: it streamed and saved at the same time | Yes, least recently played first, when the cache is over `cache_max` |
+| `◐` | Partial | Skipped before the download finished; the next play resumes it | Yes, counts toward `cache_max` |
+| `●` | Pinned | Held by a sync rule or by a ♥ favorite | Never, and not counted toward `cache_max` |
+
+- `sync` rules pin tracks: `likes` (needs `user`) and `artist:<name>`. Sync runs 15 seconds after start, then every `sync_interval`, and on `Ctrl+R`. It downloads missing pinned tracks one at a time.
+- A track that no rule or favorite holds any more moves back to the cache. It is not deleted.
+- Favoriting a SoundCloud+ track with ♥ pins it, and removing the favorite unpins it.
+- **Offline** lists everything on disk. The Pinned and Cached rows show their sizes.
+- Without network, lists come from the last listing that was saved. Tracks that are not on disk are greyed out and skipped.
+
+Files live under `dir`: `pinned/<artist>/<title> [<id>].m4a` (readable names you can use outside cliamp), `cache/<id>.m4a`, `partial/` for interrupted downloads, and `index.json`. Requires `yt-dlp` and `ffmpeg` on `PATH`.
 
 ## Mixcloud
 

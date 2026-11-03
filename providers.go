@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/bjarneo/cliamp/external/radio"
 	"github.com/bjarneo/cliamp/external/radiometa"
 	"github.com/bjarneo/cliamp/external/soundcloud"
+	"github.com/bjarneo/cliamp/external/soundcloudx"
 	"github.com/bjarneo/cliamp/external/spotify"
 	"github.com/bjarneo/cliamp/external/tidal"
 	"github.com/bjarneo/cliamp/external/yandex"
@@ -87,6 +89,7 @@ var providerKeys = []providerKey{
 	{key: "tidal", name: "Tidal", optional: true},
 	{key: "bandcamp", name: "Bandcamp", optional: true},
 	{key: "soundcloud", name: "SoundCloud", optional: true},
+	{key: "soundcloudx", alias: "scx", name: "SoundCloud+", optional: true},
 	{key: "mixcloud", name: "Mixcloud", optional: true},
 	{key: "netease", name: "NetEase", optional: true},
 	{key: "yandex", name: "Yandex Music", optional: true},
@@ -217,6 +220,11 @@ func buildProviders(cfg config.Config, interactive bool) *providerSet {
 		CookiesFrom: cfg.SoundCloud.CookiesFrom,
 	}); p != nil {
 		add("soundcloud", p)
+	}
+	if cfg.SoundCloudCustom.IsSet() {
+		if p := soundcloudx.NewFromConfig(soundCloudCustomConfig(cfg.SoundCloudCustom)); p != nil {
+			add("soundcloudx", p)
+		}
 	}
 	if p := mixcloud.NewFromConfig(mixcloud.Config{
 		Enabled:        cfg.Mixcloud.Enabled,
@@ -634,4 +642,36 @@ func logProviderWiring(providers []provider.Entry) {
 			logProviderSkipped(pk.name, pk.key, "not configured")
 		}
 	}
+}
+
+// soundCloudCustomConfig converts the [soundcloudx] section, parsing
+// the size and the interval. An invalid value is logged and the default used.
+func soundCloudCustomConfig(c config.SoundCloudCustomConfig) soundcloudx.Config {
+	out := soundcloudx.Config{
+		Enabled:     c.Enabled,
+		User:        c.User,
+		CookiesFrom: c.CookiesFrom,
+		Dir:         c.Dir,
+		Artists:     c.Artists,
+		Sync:        c.Sync,
+	}
+	if c.CacheMax != "" {
+		if n, err := soundcloudx.ParseSize(c.CacheMax); err == nil {
+			out.CacheMax = n
+		} else {
+			applog.UserWarn("soundcloudx: cache_max: %v", err)
+		}
+	}
+	switch strings.ToLower(c.SyncInterval) {
+	case "":
+	case "off", "never", "0":
+		out.SyncInterval = -1
+	default:
+		if d, err := time.ParseDuration(c.SyncInterval); err == nil && d > 0 {
+			out.SyncInterval = d
+		} else {
+			applog.UserWarn("soundcloudx: sync_interval %q is not a duration such as 6h", c.SyncInterval)
+		}
+	}
+	return out
 }

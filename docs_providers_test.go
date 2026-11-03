@@ -17,20 +17,21 @@ import (
 // YouTube needs yt-dlp, so it stays off.
 func everyProviderConfig() config.Config {
 	return config.Config{
-		Navidrome:      config.NavidromeConfig{URL: "https://nd.example.com", User: "user", Password: "secret"},
-		Lyrion:         config.LyrionConfig{URL: "http://lms.example.com:9000"},
-		Bandcamp:       config.BandcampConfig{User: "fan", Password: "secret"},
-		Plex:           config.PlexConfig{URL: "https://plex.example.com", Token: "token"},
-		Jellyfin:       config.JellyfinConfig{URL: "https://jf.example.com", Token: "token", UserID: "user-1"},
-		Emby:           config.EmbyConfig{URL: "https://emby.example.com", Token: "token", UserID: "user-1"},
-		Audiobookshelf: config.AudiobookshelfConfig{URL: "https://abs.example.com", Token: "token"},
-		Spotify:        config.SpotifyConfig{Enabled: true},
-		Qobuz:          config.QobuzConfig{Enabled: true},
-		Tidal:          config.TidalConfig{Enabled: true},
-		SoundCloud:     config.SoundCloudConfig{Enabled: true},
-		Mixcloud:       config.MixcloudConfig{Enabled: true},
-		NetEase:        config.NetEaseConfig{Enabled: true},
-		Yandex:         config.YandexConfig{Enabled: true, Token: "token"},
+		Navidrome:        config.NavidromeConfig{URL: "https://nd.example.com", User: "user", Password: "secret"},
+		Lyrion:           config.LyrionConfig{URL: "http://lms.example.com:9000"},
+		Bandcamp:         config.BandcampConfig{User: "fan", Password: "secret"},
+		Plex:             config.PlexConfig{URL: "https://plex.example.com", Token: "token"},
+		Jellyfin:         config.JellyfinConfig{URL: "https://jf.example.com", Token: "token", UserID: "user-1"},
+		Emby:             config.EmbyConfig{URL: "https://emby.example.com", Token: "token", UserID: "user-1"},
+		Audiobookshelf:   config.AudiobookshelfConfig{URL: "https://abs.example.com", Token: "token"},
+		Spotify:          config.SpotifyConfig{Enabled: true},
+		Qobuz:            config.QobuzConfig{Enabled: true},
+		Tidal:            config.TidalConfig{Enabled: true},
+		SoundCloud:       config.SoundCloudConfig{Enabled: true},
+		SoundCloudCustom: config.SoundCloudCustomConfig{Enabled: true},
+		Mixcloud:         config.MixcloudConfig{Enabled: true},
+		NetEase:          config.NetEaseConfig{Enabled: true},
+		Yandex:           config.YandexConfig{Enabled: true, Token: "token"},
 	}
 }
 
