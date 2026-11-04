@@ -509,6 +509,11 @@ func (m *Model) handleMainKey(msg tea.KeyPressMsg) tea.Cmd {
 	case "f":
 		return m.togglePlaylistStar()
 
+	case "c":
+		if track, ok := m.selectedPlaylistTrack(); ok {
+			return m.favoriteArtistKey(track)
+		}
+
 	case "shift+up", "shift+down":
 		if m.focus == focusPlaylist {
 			to := m.plCursor + 1

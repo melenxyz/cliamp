@@ -31,6 +31,10 @@ const (
 // UI shows favorite state (track rows, header badge, status messages).
 const favHeart = "♥\uFE0E"
 
+// favHeartEmpty marks the highlighted row of a track that is not a favorite,
+// showing that f would favorite it.
+const favHeartEmpty = "♡\uFE0E"
+
 // playedMarker and partialMarker flag an episode listened to the end and one
 // stopped part-way. Both carry the text variation selector so terminals render
 // them one cell wide, as favHeart does.
@@ -1247,12 +1251,14 @@ func (m Model) renderPlaylist() string {
 			styledMarkers += activeToggle.Render(mark)
 		}
 		if cols.favorite {
-			mark := " "
+			mark, markStyle := " ", favMarkerStyle
 			if m.playlistTrackFavorited(t) {
 				mark = favHeart
+			} else if selected && m.favStore != nil {
+				mark, markStyle = favHeartEmpty, dimStyle
 			}
 			markers += mark
-			styledMarkers += favMarkerStyle.Render(mark)
+			styledMarkers += markStyle.Render(mark)
 		}
 		if cols.played {
 			mark, markStyle := " ", dimStyle

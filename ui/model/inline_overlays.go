@@ -110,6 +110,8 @@ func bodyMessage(msg string, budget int) string {
 // below them rather than one long undifferentiated list.
 func (m Model) renderSearchOverlayResults(budget int) string {
 	lines := make([]string, 0, budget)
+	reporters := m.playbackStateReporters()
+	favorited := m.trackFavoriteLookup(false)
 	for row := range searchOverlayRows(m.searchOverlay.results, m.searchOverlay.scroll) {
 		if len(lines) >= budget {
 			break
@@ -121,10 +123,44 @@ func (m Model) renderSearchOverlayResults(budget int) string {
 			lines = append(lines, dimStyle.Render(labeledSeparator("", row.Section, m.layout.panelWidth)))
 			continue
 		}
-		label := truncate(trackViewName(row.Track), m.layout.panelWidth-8)
-		lines = append(lines, cursorLine(label, row.Index == m.searchOverlay.cursor))
+		lines = append(lines, m.searchResultRow(row.Track, row.Index == m.searchOverlay.cursor, reporters, favorited))
 	}
 	return strings.Join(padLines(lines, budget, len(lines)), "\n")
+}
+
+// searchResultRow renders one search result: cursor, ♥ (♡ on the
+// highlighted row when the track is not a favorite), the provider's state
+// marker, the name, and a right-aligned duration.
+func (m Model) searchResultRow(t playlist.Track, selected bool, reporters []provider.PlaybackStateReporter, favorited func(playlist.Track) bool) string {
+	rowStyle, cursor := dimStyle, "  "
+	if selected {
+		rowStyle, cursor = playlistSelectedStyle, "> "
+	}
+	heart, heartStyle := " ", favMarkerStyle
+	if !t.IsAlbum() && m.favStore != nil {
+		if favorited(t) {
+			heart = favHeart
+		} else if selected {
+			heart, heartStyle = favHeartEmpty, dimStyle
+		}
+	}
+	state, stateStyle := " ", dimStyle
+	if st, ok := playbackStateFrom(reporters, t); ok && st.Marker != "" {
+		state, stateStyle = providerMarker(st)
+	}
+	dur := formatTrackTime(t.DurationSecs)
+	// The row keeps the width the plain "> name" row had: panelWidth-6.
+	nameWidth := m.layout.panelWidth - 6 - lipgloss.Width(cursor) - 3
+	if dur != "" {
+		nameWidth -= lipgloss.Width(dur) + 1
+	}
+	nameWidth = max(nameWidth, 4)
+	name := truncate(trackViewName(t), nameWidth)
+	tail := name
+	if dur != "" {
+		tail += strings.Repeat(" ", max(0, nameWidth-lipgloss.Width(name))) + " " + dur
+	}
+	return rowStyle.Render(cursor) + heartStyle.Render(heart) + stateStyle.Render(state) + " " + rowStyle.Render(tail)
 }
 
 // renderTrackRowsBody renders a track list with album-header separators into

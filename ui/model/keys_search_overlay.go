@@ -125,6 +125,10 @@ func (m *Model) handleSearchOverlayResultsKey(msg tea.KeyPressMsg) tea.Cmd {
 			m.searchOverlay.err = ""
 			return fetchSearchOverlayPlaylistsCmd(m.searchOverlay.prov, nextRequest(&m.requests.searchOverlayLists))
 		}
+	case "c":
+		if !m.searchOverlayBusy() && m.searchOverlay.cursor >= 0 && m.searchOverlay.cursor < count {
+			return m.favoriteArtistKey(m.searchOverlay.results[m.searchOverlay.cursor])
+		}
 	case "f":
 		if !m.searchOverlayBusy() && m.searchOverlay.cursor >= 0 && m.searchOverlay.cursor < count {
 			track := m.searchOverlay.results[m.searchOverlay.cursor]

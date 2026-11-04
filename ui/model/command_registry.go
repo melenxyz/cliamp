@@ -134,6 +134,13 @@ var commandRegistry = []commandSpec{
 		}
 		return "Favorite track"
 	}, Enabled: func(m Model) bool { return m.selectedPlaylistStarAction() != starUnavailable }, Keymap: true, ContextHelp: true, Prominent: true},
+	{Mode: commandModeMain, Keys: []string{"c"}, KeyLabel: "c", Label: "Favorite artist", LabelFor: func(m Model) string {
+		track, _ := m.selectedPlaylistTrack()
+		return artistFavoriteLabel(m, track)
+	}, Enabled: func(m Model) bool {
+		track, ok := m.selectedPlaylistTrack()
+		return ok && m.canFavoriteArtist(track)
+	}, Keymap: true, ContextHelp: true},
 	{Mode: commandModeMain, Keys: []string{"a"}, KeyLabel: "a", Label: "Toggle queue (play next)", Keymap: true, ContextHelp: true},
 	{Mode: commandModeMain, Keys: []string{"A"}, KeyLabel: "A", Label: "Queue manager", Keymap: true},
 	{Mode: commandModeMain | commandModeProvider, Keys: []string{"F"}, KeyLabel: "F", Label: "Subscribed shows", Enabled: func(m Model) bool { return m.hasSubscriptions() }, Keymap: true},
@@ -253,6 +260,13 @@ var commandRegistry = []commandSpec{
 	{Mode: commandModeNetSearch, Keys: []string{"f"}, KeyLabel: "f", Label: "Favorite track", ContextHelp: true, Enabled: func(m Model) bool {
 		return m.favStore != nil && m.netSearch.screen == netSearchResults && !m.netSearch.loading && len(m.netSearch.results) > 0
 	}},
+	{Mode: commandModeSearchOverlay, Keys: []string{"c"}, KeyLabel: "c", Label: "Favorite artist", LabelFor: func(m Model) string {
+		track, _ := m.selectedSearchResult()
+		return artistFavoriteLabel(m, track)
+	}, Enabled: func(m Model) bool {
+		track, ok := m.selectedSearchResult()
+		return ok && !m.searchOverlayBusy() && m.canFavoriteArtist(track)
+	}, ContextHelp: true, Prominent: true},
 	{Mode: commandModeSearchOverlay, Keys: []string{"p"}, KeyLabel: "p", Label: "Save to a playlist", Keymap: true, ContextHelp: true, Enabled: func(m Model) bool {
 		return m.searchOverlay.screen == searchOverlayResults && !m.searchOverlayBusy() &&
 			m.searchOverlay.cursor >= 0 && m.searchOverlay.cursor < len(m.searchOverlay.results)

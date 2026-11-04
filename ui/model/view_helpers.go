@@ -19,6 +19,9 @@ const restrictedViewSuffix = " [E]"
 // mutating the title used by playlist export, IPC, or media-session metadata.
 func trackViewName(track playlist.Track) string {
 	name := track.DisplayName()
+	if display := track.Meta(provider.MetaDisplayName); display != "" {
+		name = display
+	}
 	if track.Meta(provider.MetaPodcastFeed) != "" && track.Title != "" {
 		name = podcastEpisodeViewName(track)
 	}

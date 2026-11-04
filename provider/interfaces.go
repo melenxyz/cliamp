@@ -337,6 +337,20 @@ type TrackFavoriter interface {
 	SetTrackFavorite(ctx context.Context, track playlist.Track, favorite bool) error
 }
 
+// ArtistFavoriter is implemented by providers that keep a list of favorite
+// artists, so the UI can add or remove the artist of a selected track.
+type ArtistFavoriter interface {
+	// CanFavoriteArtist reports whether track's artist can be favorited
+	// here. It must not do I/O.
+	CanFavoriteArtist(track playlist.Track) bool
+	// ArtistFavorited reports whether track's artist is a favorite. It must
+	// not do I/O.
+	ArtistFavorited(track playlist.Track) bool
+	// ToggleArtistFavorite adds or removes track's artist and returns the new
+	// state and the artist's display name.
+	ToggleArtistFavorite(track playlist.Track) (favorite bool, name string, err error)
+}
+
 // FavoriteToggler is implemented by providers that support marking items
 // as favorites (e.g. radio station favorites).
 type FavoriteToggler interface {

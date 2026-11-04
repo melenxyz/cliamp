@@ -70,6 +70,10 @@ func YearFromDate(date string) int {
 }
 
 // ProviderMeta key constants used across providers and the UI.
+// MetaDisplayName overrides how list rows name a track, for providers whose
+// tracks read better with their own convention than "Artist - Title".
+const MetaDisplayName = "display"
+
 const (
 	MetaNavidromeID = "navidrome.id"
 	MetaJellyfinID  = "jellyfin.id"
