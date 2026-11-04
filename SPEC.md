@@ -236,6 +236,14 @@ All six are implemented. Config reference: `docs/configuration.md`, section
 - **2026-11-04: Footer:** pinned downloads (favorites, sync) show
   `↓ Pinning <track>… 40%`, then `● Pinned <track>` or the error. Downloads
   that only playback wants stay quiet.
+- **2026-11-04: Durations** for artist pages and likes come from a background
+  yt-dlp extraction (10 tracks per call, 3 calls at a time, 150 tracks per list
+  open), saved to the index so each track is looked up once. `Ctrl+R` reloads
+  the open list in place (`RefreshablePlaylist`) to show them. Calling
+  SoundCloud's api-v2 directly with yt-dlp's cached client_id would give
+  durations in one request, but it was ruled out: it means using a scraped
+  private-API key, which Claude Code's auto mode blocked as access
+  circumvention. Revisit only as an explicit decision.
 - **2026-11-04: Gapless preload** of the next track starts its download too,
   so the next track is usually on disk before it plays.
 

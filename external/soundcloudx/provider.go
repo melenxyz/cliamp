@@ -24,6 +24,7 @@ import (
 var (
 	_ playlist.Provider              = (*Provider)(nil)
 	_ playlist.Refresher             = (*Provider)(nil)
+	_ playlist.RefreshablePlaylist   = (*Provider)(nil)
 	_ provider.Searcher              = (*Provider)(nil)
 	_ provider.CustomStreamer        = (*Provider)(nil)
 	_ provider.PlaybackStateReporter = (*Provider)(nil)
@@ -73,6 +74,9 @@ type Provider struct {
 	artistsMu sync.Mutex
 	artists   []string
 
+	fetchDurations durationFetcher
+	durations      durationState
+
 	syncNow  chan struct{}
 	stop     context.CancelFunc
 	life     context.Context
@@ -98,6 +102,7 @@ func NewFromConfig(cfg Config) *Provider {
 	}
 	resolve.SetYTDLCookiesForHost("soundcloud.com", cfg.CookiesFrom)
 	p := newProvider(cfg, store, ytdlpList)
+	p.fetchDurations = ytdlpDurations
 	if len(cfg.Sync) > 0 && cfg.SyncInterval >= 0 {
 		p.startSyncLoop()
 	}
@@ -197,7 +202,18 @@ func (p *Provider) Tracks(id string) ([]playlist.Track, error) {
 	if err := p.store.SetList(id, keys); err != nil {
 		applog.Warn("soundcloudx: save list: %v", err)
 	}
+	p.fillDurations(keys)
 	return p.tracksFor(keys, false), nil
+}
+
+// CanRefreshPlaylist lets Ctrl+R reload an open list in place, which shows
+// durations fetched since it opened. Implements playlist.RefreshablePlaylist.
+func (p *Provider) CanRefreshPlaylist(id string) bool {
+	switch id {
+	case listOnDisk, listPinned, listCached:
+		return true
+	}
+	return p.pageFor(id) != ""
 }
 
 func (p *Provider) offlineTracks(id string) []playlist.Track {

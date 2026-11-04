@@ -484,6 +484,7 @@ Every track is in one of three states, shown in the marker column:
 - Favoriting a SoundCloud+ track with ♥ pins it, and removing the favorite unpins it. The footer shows the download's progress and then `● Pinned <track>`. Downloads for normal plays stay quiet.
 - `c` adds the selected track's artist to the Artists section, or removes it, and saves the list to `artists`. It downloads nothing; use an `artist:<name>` sync rule to pin a whole catalogue.
 - Rows read `Artist – Title`. A title that repeats the uploader's name ("Forss - Flickermood" by Forss) drops the repeat. Search results also show the ♥ (♡ on the highlighted row), the state marker and the duration.
+- Artist pages and Likes list no durations, so SoundCloud+ looks them up in the background after a list opens (up to 150 tracks per open) and saves them. The footer says when they are ready, and `Ctrl+R` reloads the open list to show them.
 - **Offline** lists everything on disk. The Pinned and Cached rows show their sizes.
 - Without network, lists come from the last listing that was saved. Tracks that are not on disk are greyed out and skipped.
 

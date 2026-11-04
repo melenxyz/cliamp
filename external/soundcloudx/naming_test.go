@@ -1,6 +1,7 @@
 package soundcloudx
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"testing"
@@ -116,5 +117,50 @@ func TestOpenStoreLearnsNamesFromOldEntries(t *testing.T) {
 	p := newProvider(Config{}, again, nil)
 	if tr := p.track(mustGet(t, again, "2"), false); tr.Artist != "Bastom" {
 		t.Fatalf("slug-only track artist = %q, want Bastom", tr.Artist)
+	}
+}
+
+func TestParseDurations(t *testing.T) {
+	out := "293\thttps://soundcloud.com/forss/flickermood\t213.886\tForss\n" +
+		"9\thttps://soundcloud.com/x/y\tNA\tX\n" +
+		"bad line\n" +
+		"10\thttps://soundcloud.com/a/b\t61\tNA\n"
+	got := parseDurations(out)
+	want := []Meta{
+		{Key: "293", Permalink: "forss/flickermood", Artist: "Forss", Duration: 213},
+		{Key: "10", Permalink: "a/b", Duration: 61},
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("parseDurations = %+v", got)
+	}
+}
+
+func TestTracksFillsDurationsInBackground(t *testing.T) {
+	page := "https://soundcloud.com/forss/tracks"
+	fl := &fakeLister{pages: map[string][]Meta{page: {
+		{Key: "1", Permalink: "forss/a", Title: "A", Artist: "forss"},
+		{Key: "2", Permalink: "forss/b", Title: "B", Artist: "forss", Duration: 99},
+	}}}
+	p := newProvider(Config{Artists: []string{"forss"}}, newTestStore(t, 0), fl.list)
+	t.Cleanup(p.Close)
+	asked := make(chan []string, 4)
+	p.fetchDurations = func(_ context.Context, perms []string) ([]Meta, error) {
+		asked <- perms
+		return []Meta{{Key: "1", Permalink: "forss/a", Artist: "Forss", Duration: 42}}, nil
+	}
+	tracks, err := p.Tracks("artist:forss")
+	if err != nil || tracks[0].DurationSecs != 0 {
+		t.Fatalf("first open = %+v, %v", tracks, err)
+	}
+	if perms := <-asked; !slices.Equal(perms, []string{"forss/a"}) {
+		t.Fatalf("looked up %v; only the track without a duration should be", perms)
+	}
+	waitFor(t, func() bool { e, _ := p.store.Get("1"); return e.Duration == 42 })
+	if !p.CanRefreshPlaylist("artist:forss") {
+		t.Fatal("Ctrl+R should reload the list in place")
+	}
+	tracks, _ = p.Tracks("artist:forss")
+	if tracks[0].DurationSecs != 42 || tracks[0].Artist != "Forss" {
+		t.Fatalf("after refresh = %+v", tracks[0])
 	}
 }
