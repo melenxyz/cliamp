@@ -150,7 +150,7 @@ func (m Model) searchResultRow(t playlist.Track, selected bool, reporters []prov
 	}
 	dur := formatTrackTime(t.DurationSecs)
 	// The row keeps the width the plain "> name" row had: panelWidth-6.
-	nameWidth := m.layout.panelWidth - 6 - lipgloss.Width(cursor) - 3
+	nameWidth := m.layout.panelWidth - 6 - lipgloss.Width(cursor) - 4
 	if dur != "" {
 		nameWidth -= lipgloss.Width(dur) + 1
 	}
@@ -160,7 +160,7 @@ func (m Model) searchResultRow(t playlist.Track, selected bool, reporters []prov
 	if dur != "" {
 		tail += strings.Repeat(" ", max(0, nameWidth-lipgloss.Width(name))) + " " + dur
 	}
-	return rowStyle.Render(cursor) + heartStyle.Render(heart) + stateStyle.Render(state) + " " + rowStyle.Render(tail)
+	return rowStyle.Render(cursor) + heartStyle.Render(heart) + " " + stateStyle.Render(state) + " " + rowStyle.Render(tail)
 }
 
 // renderTrackRowsBody renders a track list with album-header separators into

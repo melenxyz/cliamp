@@ -27,13 +27,15 @@ const (
 	titleScrollInterval = 200 * time.Millisecond
 )
 
-// favHeart is the small, text-presentation favorite heart used everywhere the
-// UI shows favorite state (track rows, header badge, status messages).
-const favHeart = "♥\uFE0E"
+// favHeart is the favorite heart used everywhere the UI shows favorite state
+// (track rows, header badge, status messages). This fork uses the Nerd Font
+// heart (nf-fa-heart), drawn the same size as the SoundCloud+ state icons;
+// upstream uses "♥\uFE0E".
+const favHeart = "\uF004"
 
 // favHeartEmpty marks the highlighted row of a track that is not a favorite,
 // showing that f would favorite it.
-const favHeartEmpty = "♡\uFE0E"
+const favHeartEmpty = "\uF08A" // nf-fa-heart_o
 
 // playedMarker and partialMarker flag an episode listened to the end and one
 // stopped part-way. Both carry the text variation selector so terminals render
@@ -1272,8 +1274,9 @@ func (m Model) renderPlaylist() string {
 					mark, markStyle = partialMarker, dimStyle
 				}
 			}
-			markers += mark
-			styledMarkers += markStyle.Render(mark)
+			// A space keeps the state marker clear of the ♥ before it.
+			markers += " " + mark
+			styledMarkers += " " + markStyle.Render(mark)
 		}
 		markers += " "
 		styledMarkers += " "

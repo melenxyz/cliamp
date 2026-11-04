@@ -221,6 +221,12 @@ All six are implemented. Config reference: `docs/configuration.md`, section
 - **2026-11-04: Index** is `index.json` in the storage root (no new
   dependency), written atomically on every change. It also keeps the last
   listing of each list, for offline browsing.
+- **2026-11-04: Nerd Font icons.** The Unicode heart looked bigger than the
+  circles, so the heart (filled and outline) and the three state markers now
+  use Font Awesome glyphs from the Nerd Font (U+F004/U+F08A heart,
+  U+F111 pinned, U+F042 cached, U+F017 partial). They need a Nerd Font, which
+  every terminal on this machine uses. `favHeart` in `ui/model/view.go` is the
+  one place to change back to `"♥\uFE0E"`.
 - **2026-11-04: Naming:** rows read `Artist – Title` (en dash, so it stands
   apart from hyphens inside titles). The artist is the uploader's display
   name, learned from search results and downloads and reused for the slug-only

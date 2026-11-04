@@ -44,11 +44,12 @@ const (
 	artistList  = "artist:"
 )
 
-// Markers drawn in the playlist's state column.
+// Markers drawn in the playlist's state column: Nerd Font (Font Awesome)
+// icons, the same size as the fork's heart.
 const (
-	markerPinned  = "●︎" // ●
-	markerCached  = "◐︎" // ◐
-	markerPartial = "◷︎" // ◷ a clock face: waiting to resume
+	markerPinned  = "\uF111" // nf-fa-circle
+	markerCached  = "\uF042" // nf-fa-adjust (half-filled circle)
+	markerPartial = "\uF017" // nf-fa-clock_o: waiting to resume
 )
 
 const (

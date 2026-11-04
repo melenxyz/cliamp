@@ -94,7 +94,7 @@ func TestRadioFavoriteAfterBrowseLoadsPlaylist(t *testing.T) {
 			if !found || !m.playlistTrackFavorited(tracks[1]) {
 				t.Fatal("favorite missing from Radio pane or playback heart state")
 			}
-			if plain := ansi.Strip(m.renderPlaylist()); !strings.Contains(plain, "♥") || strings.Contains(plain, "★") {
+			if plain := ansi.Strip(m.renderPlaylist()); !strings.Contains(plain, favHeart) || strings.Contains(plain, "★") {
 				t.Fatalf("station favorite did not render as a heart:\n%s", plain)
 			}
 			track, _ := m.playlist.Track(1)
@@ -610,7 +610,7 @@ func TestRadioFavoriteHeartKeepsLayout(t *testing.T) {
 				t.Fatal(err)
 			}
 			after := m.renderPlaylist()
-			if got := strings.Contains(ansi.Strip(after), "♥"); got != tc.want {
+			if got := strings.Contains(ansi.Strip(after), favHeart); got != tc.want {
 				t.Errorf("heart shown = %v, want %v", got, tc.want)
 			}
 			if strings.Contains(after, "★") {
@@ -812,7 +812,7 @@ func TestPlaybackHeaderShowsOnlyHeartBadge(t *testing.T) {
 		t.Fatalf("header shows a star badge: %s", header)
 	}
 	m.favSet = map[string]struct{}{"/music/local.mp3": {}}
-	if header := ansi.Strip(m.renderPlaybackHeader()); !strings.Contains(header, "♥") || !strings.Contains(header, " 1]") {
+	if header := ansi.Strip(m.renderPlaybackHeader()); !strings.Contains(header, favHeart) || !strings.Contains(header, " 1]") {
 		t.Fatalf("header = %s, want the heart badge", header)
 	}
 }
