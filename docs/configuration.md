@@ -475,13 +475,15 @@ Every track is in one of three states, shown in the marker column:
 | Marker | State | How it got there | Evicted? |
 | --- | --- | --- | --- |
 | (none) | Remote | Never played or downloaded | n/a |
-| `○` | Cached | Played once: it streamed and saved at the same time | Yes, least recently played first, when the cache is over `cache_max` |
-| `◐` | Partial | Skipped before the download finished; the next play resumes it | Yes, counts toward `cache_max` |
+| `◐` | Cached | Played once: it streamed and saved at the same time | Yes, least recently played first, when the cache is over `cache_max` |
+| `◷` | Partial | Skipped before the download finished; the next play resumes it | Yes, counts toward `cache_max` |
 | `●` | Pinned | Held by a sync rule or by a ♥ favorite | Never, and not counted toward `cache_max` |
 
 - `sync` rules pin tracks: `likes` (needs `user`) and `artist:<name>`. Sync runs 15 seconds after start, then every `sync_interval`, and on `Ctrl+R`. It downloads missing pinned tracks one at a time.
 - A track that no rule or favorite holds any more moves back to the cache. It is not deleted.
-- Favoriting a SoundCloud+ track with ♥ pins it, and removing the favorite unpins it.
+- Favoriting a SoundCloud+ track with ♥ pins it, and removing the favorite unpins it. The footer shows the download's progress and then `● Pinned <track>`. Downloads for normal plays stay quiet.
+- `c` adds the selected track's artist to the Artists section, or removes it, and saves the list to `artists`. It downloads nothing; use an `artist:<name>` sync rule to pin a whole catalogue.
+- Rows read `Artist – Title`. A title that repeats the uploader's name ("Forss - Flickermood" by Forss) drops the repeat. Search results also show the ♥ (♡ on the highlighted row), the state marker and the duration.
 - **Offline** lists everything on disk. The Pinned and Cached rows show their sizes.
 - Without network, lists come from the last listing that was saved. Tracks that are not on disk are greyed out and skipped.
 

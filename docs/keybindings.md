@@ -123,6 +123,7 @@ and `Esc` clears it.
 | Key | Action |
 |---|---|
 | `f` | Toggle the favorite ♥ on the selected track. Favorites appear in the "Favorites" virtual playlist, and cliamp also saves them on Spotify and Navidrome. For directory radio stations outside saved local playlists, toggle Radio Favorites from the browser or playback playlist, including country and genre results. In the country browser, pin the selected country or region. On a podcast show, subscribe or unsubscribe. |
+| `c` | SoundCloud+: add the artist of the selected track to the Artists section, or remove it. Nothing is downloaded. |
 | `Ctrl+F` | Search with the active provider (Podcasts, Spotify, Qobuz, Tidal, Bandcamp, Navidrome, Lyrion, Jellyfin, Emby, Plex, Audiobookshelf, Mixcloud, NetEase, SoundCloud, SoundCloud+, Yandex Music, Local), or search YouTube. Available in playlist and provider-browser views. The search line names the source. See [Search and filter modes](#search-and-filter-modes). |
 | `u` | Load URL (stream/playlist) |
 | `d` | Open the audio device picker |
@@ -361,6 +362,7 @@ search and the results list is open:
 | `a` | Append the selected track to the playlist |
 | `q` | Queue the selected track to play next |
 | `f` | Toggle the favorite ♥ on the selected track. On a podcast show, subscribe or unsubscribe. |
+| `c` | SoundCloud+: add the artist of the selected track to the Artists section, or remove it. Nothing is downloaded. |
 | `p` | (Spotify only) Save the selected track to a Spotify playlist |
 | `Esc` `Backspace` | Back to the search input |
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +52,9 @@ type job struct {
 	err      error
 	file     string // the committed file on success
 
+	nameMu        sync.Mutex
+	artist, title string // as the download reported them
+
 	// Guarded by downloader.mu.
 	players int  // streamers reading this download
 	keep    bool // a pin wants the file: finish even when no one listens
@@ -92,8 +96,9 @@ func (d *downloader) start(m Meta, player bool) *job {
 	if j, ok := d.jobs[m.Key]; ok {
 		if player {
 			j.players++
-		} else {
+		} else if !j.keep {
 			j.keep = true
+			applog.Status("↓ Pinning %s…", j.name())
 		}
 		return j
 	}
@@ -166,6 +171,8 @@ func (d *downloader) run(ctx context.Context, j *job) {
 		"--socket-timeout", "15",
 		"--print", "before_dl:%(.{id,title,uploader,duration,ext})j",
 		"--print", "after_move:%(.{filepath})j",
+		"--progress", "--newline",
+		"--progress-template", "download:" + progressPrefix + "%(progress.fragment_index)s %(progress.fragment_count)s %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s",
 		"-o", d.store.PartialTemplate(j.key),
 	}
 	if b := ytdlcookies.ForURL(pageBase); b != "" {
@@ -190,7 +197,19 @@ func (d *downloader) run(ctx context.Context, j *job) {
 	var final string
 	sc := bufio.NewScanner(stdout)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	d.announce(j)
+	var lastPct = -1
+	var lastEmit time.Time
 	for sc.Scan() {
+		if rest, ok := strings.CutPrefix(sc.Text(), progressPrefix); ok {
+			if pct, ok := parseProgress(rest); ok && pct != lastPct && (pct == 100 || time.Since(lastEmit) >= progressEvery) {
+				lastPct, lastEmit = pct, time.Now()
+				if d.pinned(j) {
+					applog.Status("↓ Pinning %s… %d%%", j.name(), pct)
+				}
+			}
+			continue
+		}
 		var info downloadInfo
 		if json.Unmarshal(sc.Bytes(), &info) != nil {
 			continue
@@ -203,6 +222,9 @@ func (d *downloader) run(ctx context.Context, j *job) {
 			continue
 		}
 		j.info = info
+		if info.Title != "" {
+			j.setTitle(info.Uploader, info.Title)
+		}
 		j.partPath = prefix + info.Ext + ".part"
 		readyOnce()
 	}
@@ -234,6 +256,9 @@ func (d *downloader) run(ctx context.Context, j *job) {
 			msg = "no file downloaded"
 		}
 		j.err = fmt.Errorf("yt-dlp: %s", msg)
+		if d.pinned(j) {
+			applog.UserWarn("✗ Couldn't download %s: %s", j.name(), msg)
+		}
 		if resuming {
 			// The spec's discard rule: a resume that fails starts over next time.
 			applog.Warn("soundcloudx: resume of %s failed, discarding the partial download: %v", j.key, j.err)
@@ -250,7 +275,80 @@ func (d *downloader) run(ctx context.Context, j *job) {
 			return
 		}
 		j.file = file
+		if d.pinned(j) {
+			applog.Status("● Pinned %s", j.name())
+		}
 	}
+}
+
+// progressPrefix marks yt-dlp's progress lines on stdout.
+const progressPrefix = "scxprog "
+
+// progressEvery throttles the footer updates of one download.
+const progressEvery = 1500 * time.Millisecond
+
+// parseProgress turns a progress line into a percentage. HLS downloads
+// count fragments; others count bytes. yt-dlp prints NA for unknown fields.
+func parseProgress(s string) (int, bool) {
+	f := strings.Fields(s)
+	if len(f) != 5 {
+		return 0, false
+	}
+	num := func(v string) float64 {
+		n, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0
+		}
+		return n
+	}
+	idx, count, done := num(f[0]), num(f[1]), num(f[2])
+	total := num(f[3])
+	if total == 0 {
+		total = num(f[4])
+	}
+	var pct float64
+	switch {
+	case count > 0:
+		pct = idx / count * 100
+	case total > 0:
+		pct = done / total * 100
+	default:
+		return 0, false
+	}
+	return int(min(max(pct, 0), 100)), true
+}
+
+// pinned reports whether a pin (a favorite or a sync rule) wants j, which is
+// when the footer shows its progress. Downloads that only playback wants stay
+// quiet: the ○ marker shows them.
+func (d *downloader) pinned(j *job) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return j.keep
+}
+
+// announce shows that a pinned download started.
+func (d *downloader) announce(j *job) {
+	if d.pinned(j) {
+		applog.Status("↓ Pinning %s…", j.name())
+	}
+}
+
+// name is the job's track as the footer shows it.
+func (j *job) name() string {
+	j.nameMu.Lock()
+	defer j.nameMu.Unlock()
+	if j.title == "" {
+		return displayName(j.meta.Artist, j.meta.Title)
+	}
+	return displayName(j.artist, j.title)
+}
+
+// setTitle records the names the download reported.
+func (j *job) setTitle(artist, title string) {
+	j.nameMu.Lock()
+	j.artist, j.title = artist, title
+	j.nameMu.Unlock()
 }
 
 // hasPartFile reports whether an interrupted download exists for prefix.

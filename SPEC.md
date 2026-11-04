@@ -213,12 +213,29 @@ All six are implemented. Config reference: `docs/configuration.md`, section
 - **2026-11-04: Seeking during a download** is allowed inside the part already
   downloaded (estimated at 160 kbps); after the download is committed, seeks
   use the final file.
-- **2026-11-04: Markers:** `●` pinned, `○` cached, `◐` partial. Upstream's
+- **2026-11-04: Markers:** `●` pinned, `◐` cached, `◷` partial (changed the
+  same day from `○` cached / `◐` partial: half a circle reads better as
+  "cached", and partials are rare enough for a clock). Upstream's
   `PlaybackState` gained an optional `Marker` field (small patch in
   `provider/interfaces.go`, `ui/model/view.go`, `ui/model/inline_overlays.go`).
 - **2026-11-04: Index** is `index.json` in the storage root (no new
   dependency), written atomically on every change. It also keeps the last
   listing of each list, for offline browsing.
+- **2026-11-04: Naming:** rows read `Artist – Title` (en dash, so it stands
+  apart from hyphens inside titles). The artist is the uploader's display
+  name, learned from search results and downloads and reused for the slug-only
+  artist pages. A title that starts with the uploader's name drops it. Shown
+  through a new `provider.MetaDisplayName` override in `trackViewName`.
+- **2026-11-04: Hearts:** a filled ♥ always shows on favorites; an empty ♡
+  shows only on the highlighted row (playlist and search results). Search rows
+  also show the state marker and the duration.
+- **2026-11-04: Favorite artist = `c`** ("creator"; lowercase `h` is EQ left). It adds the uploader to the Artists
+  section (saved to `artists` in the config) or removes it. It downloads
+  nothing; an `artist:<name>` sync rule is how a catalogue gets pinned. New
+  capability `provider.ArtistFavoriter`.
+- **2026-11-04: Footer:** pinned downloads (favorites, sync) show
+  `↓ Pinning <track>… 40%`, then `● Pinned <track>` or the error. Downloads
+  that only playback wants stay quiet.
 - **2026-11-04: Gapless preload** of the next track starts its download too,
   so the next track is usually on disk before it plays.
 

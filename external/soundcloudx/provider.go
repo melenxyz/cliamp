@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ var (
 	_ provider.PlaybackStateReporter = (*Provider)(nil)
 	_ provider.TrackFavoriter        = (*Provider)(nil)
 	_ provider.Closer                = (*Provider)(nil)
+	_ provider.ArtistFavoriter       = (*Provider)(nil)
 )
 
 // Playlist IDs of the fixed rows.
@@ -44,8 +46,8 @@ const (
 // Markers drawn in the playlist's state column.
 const (
 	markerPinned  = "●︎" // ●
-	markerCached  = "○︎" // ○
-	markerPartial = "◐︎" // ◐
+	markerCached  = "◐︎" // ◐
+	markerPartial = "◷︎" // ◷ a clock face: waiting to resume
 )
 
 const (
@@ -63,6 +65,13 @@ type Provider struct {
 	store *Store
 	dl    *downloader
 	list  lister
+
+	// SaveArtists persists the Artists list when c changes it. nil keeps
+	// the change for this run only.
+	SaveArtists func(artists []string) error
+
+	artistsMu sync.Mutex
+	artists   []string
 
 	syncNow  chan struct{}
 	stop     context.CancelFunc
@@ -98,7 +107,14 @@ func NewFromConfig(cfg Config) *Provider {
 func newProvider(cfg Config, store *Store, list lister) *Provider {
 	cfg.User = strings.TrimSpace(cfg.User)
 	life, stop := context.WithCancel(context.Background())
+	var artists []string
+	for _, a := range cfg.Artists {
+		if a = strings.TrimSpace(a); a != "" && !slices.Contains(artists, a) {
+			artists = append(artists, a)
+		}
+	}
 	return &Provider{
+		artists: artists,
 		cfg:     cfg,
 		store:   store,
 		dl:      newDownloader(store),
@@ -122,10 +138,8 @@ func (p *Provider) Playlists() ([]playlist.PlaylistInfo, error) {
 			playlist.PlaylistInfo{ID: listReposts, Name: "Reposts", Section: p.cfg.User},
 		)
 	}
-	for _, a := range p.cfg.Artists {
-		if a = strings.TrimSpace(a); a != "" {
-			out = append(out, playlist.PlaylistInfo{ID: artistList + a, Name: a, Section: "Artists"})
-		}
+	for _, a := range p.artistList() {
+		out = append(out, playlist.PlaylistInfo{ID: artistList + a, Name: p.artistName(a), Section: "Artists"})
 	}
 	st := p.store.Stats()
 	out = append(out,
@@ -212,20 +226,98 @@ func (p *Provider) tracksFor(keys []string, offline bool) []playlist.Track {
 // track builds the playlist track for an index entry. Offline, a track
 // without a complete file is unplayable, so the UI greys it out and skips it.
 func (p *Provider) track(e Entry, offline bool) playlist.Track {
-	title := e.Title
+	artist := e.Artist
+	if slug := artistFromPermalink(e.Permalink); artist == "" || artist == slug {
+		artist = p.artistName(slug)
+	}
+	title := cleanTitle(e.Title, artist)
 	if title == "" {
 		title = e.Permalink
 	}
 	return playlist.Track{
 		Path:         buildURI(e.Key, e.Permalink),
 		Title:        title,
-		Artist:       e.Artist,
+		Artist:       artist,
 		DurationSecs: e.Duration,
 		// Stream must be false: true makes pause stop and restart the track.
-		Stream:       false,
-		Unplayable:   offline && e.File == "",
-		ProviderMeta: map[string]string{MetaID: e.Key},
+		Stream:     false,
+		Unplayable: offline && e.File == "",
+		ProviderMeta: map[string]string{
+			MetaID:                   e.Key,
+			provider.MetaDisplayName: displayName(artist, title),
+		},
 	}
+}
+
+// artistList returns the Artists section, in the order it was added.
+func (p *Provider) artistList() []string {
+	p.artistsMu.Lock()
+	defer p.artistsMu.Unlock()
+	return slices.Clone(p.artists)
+}
+
+// artistName returns the display name of an artist slug: the uploader name
+// a listing or download reported, or the slug itself.
+func (p *Provider) artistName(slug string) string {
+	if name := p.store.ArtistName(slug); name != "" {
+		return name
+	}
+	return slug
+}
+
+// artistSlug returns the uploader slug of a SoundCloud+ track.
+func artistSlug(track playlist.Track) string {
+	_, perm, ok := parseURI(track.Path)
+	if !ok {
+		return ""
+	}
+	return artistFromPermalink(perm)
+}
+
+// CanFavoriteArtist implements provider.ArtistFavoriter.
+func (p *Provider) CanFavoriteArtist(track playlist.Track) bool { return artistSlug(track) != "" }
+
+// ArtistFavorited implements provider.ArtistFavoriter.
+func (p *Provider) ArtistFavorited(track playlist.Track) bool {
+	slug := artistSlug(track)
+	p.artistsMu.Lock()
+	defer p.artistsMu.Unlock()
+	return slug != "" && slices.Contains(p.artists, slug)
+}
+
+// ToggleArtistFavorite adds track's uploader to the Artists section, or
+// removes it. It never downloads anything: pinning an artist's catalogue is
+// the artist:<name> sync rule. Implements provider.ArtistFavoriter.
+func (p *Provider) ToggleArtistFavorite(track playlist.Track) (bool, string, error) {
+	slug := artistSlug(track)
+	if slug == "" {
+		return false, "", fmt.Errorf("soundcloudx: no artist for %s", track.Path)
+	}
+	name := p.artistName(slug)
+	if name == slug && track.Artist != "" {
+		name = track.Artist
+	}
+
+	p.artistsMu.Lock()
+	old := slices.Clone(p.artists)
+	added := !slices.Contains(p.artists, slug)
+	if added {
+		p.artists = append(p.artists, slug)
+	} else {
+		p.artists = slices.DeleteFunc(p.artists, func(a string) bool { return a == slug })
+	}
+	next := slices.Clone(p.artists)
+	p.artistsMu.Unlock()
+
+	if p.SaveArtists != nil {
+		if err := p.SaveArtists(next); err != nil {
+			p.artistsMu.Lock()
+			p.artists = old
+			p.artistsMu.Unlock()
+			return !added, name, fmt.Errorf("save artists: %w", err)
+		}
+	}
+	return added, name, nil
 }
 
 // SearchTracks searches SoundCloud through yt-dlp's scsearch.

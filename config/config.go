@@ -1306,6 +1306,16 @@ func SaveMixcloudStyles(styles []string) error {
 	return SaveSection("mixcloud", []KeyValue{{"styles", "[" + strings.Join(quoted, ", ") + "]"}}, nil)
 }
 
+// SaveSoundCloudXArtists writes the artists list of the [soundcloudx]
+// section, which c in SoundCloud+ edits.
+func SaveSoundCloudXArtists(artists []string) error {
+	quoted := make([]string, 0, len(artists))
+	for _, a := range artists {
+		quoted = append(quoted, QuoteString(a))
+	}
+	return SaveSection("soundcloudx", []KeyValue{{"artists", "[" + strings.Join(quoted, ", ") + "]"}}, nil)
+}
+
 // KeyValue is one key line for SaveSection. Value is the TOML text of the
 // value, such as QuoteString(s), a number, a bool or a list.
 type KeyValue struct {

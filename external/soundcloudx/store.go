@@ -65,6 +65,7 @@ type indexFile struct {
 	Version int                 `json:"version"`
 	Tracks  map[string]*Entry   `json:"tracks"`
 	Lists   map[string][]string `json:"lists,omitempty"`
+	Artists map[string]string   `json:"artists,omitempty"` // user slug -> display name
 }
 
 // Stats summarizes what is on disk.
@@ -87,7 +88,8 @@ type Store struct {
 	mu     sync.RWMutex
 	tracks map[string]*Entry
 	lists  map[string][]string
-	busy   map[string]int // keys that eviction must skip: playing or downloading
+	names  map[string]string // artist slug -> display name
+	busy   map[string]int    // keys that eviction must skip: playing or downloading
 }
 
 // openStore loads root/index.json. A missing index is an empty store; the
@@ -102,6 +104,7 @@ func openStore(root string, cacheMax int64) (*Store, error) {
 		now:      time.Now,
 		tracks:   map[string]*Entry{},
 		lists:    map[string][]string{},
+		names:    map[string]string{},
 		busy:     map[string]int{},
 	}
 	data, err := os.ReadFile(filepath.Join(root, indexName))
@@ -125,6 +128,16 @@ func openStore(root string, cacheMax int64) (*Store, error) {
 	if f.Lists != nil {
 		s.lists = f.Lists
 	}
+	if f.Artists != nil {
+		s.names = f.Artists
+	}
+	// An index written before names were learned still holds them in its
+	// entries: a search result or download stored the uploader's real name.
+	for _, e := range s.tracks {
+		if slug := artistFromPermalink(e.Permalink); slug != "" && e.Artist != "" && e.Artist != slug && s.names[slug] == "" {
+			s.names[slug] = e.Artist
+		}
+	}
 	return s, nil
 }
 
@@ -133,7 +146,7 @@ func (s *Store) saveLocked() error {
 	if err := os.MkdirAll(s.root, 0o755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(indexFile{Version: 1, Tracks: s.tracks, Lists: s.lists}, "", "  ")
+	data, err := json.MarshalIndent(indexFile{Version: 1, Tracks: s.tracks, Lists: s.lists, Artists: s.names}, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -214,7 +227,19 @@ func (s *Store) entryLocked(m Meta) *Entry {
 	if m.Duration > 0 {
 		e.Duration = m.Duration
 	}
+	// Remember the uploader's real name for the slug, so lists that only
+	// know the slug (an artist's page) can show it.
+	if slug := artistFromPermalink(e.Permalink); slug != "" && m.Artist != "" && m.Artist != slug {
+		s.names[slug] = m.Artist
+	}
 	return e
+}
+
+// ArtistName returns the display name known for an artist slug, or "".
+func (s *Store) ArtistName(slug string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.names[slug]
 }
 
 // Update merges metadata into the index. Entries for remote tracks are kept
@@ -365,7 +390,7 @@ func pinnedRel(e *Entry, ext string) string {
 	if artist == "" {
 		artist = "Unknown"
 	}
-	title := sanitizeName(e.Title)
+	title := sanitizeName(cleanTitle(e.Title, e.Artist))
 	if title == "" {
 		title = "Untitled"
 	}

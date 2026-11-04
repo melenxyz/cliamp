@@ -223,6 +223,7 @@ func buildProviders(cfg config.Config, interactive bool) *providerSet {
 	}
 	if cfg.SoundCloudCustom.IsSet() {
 		if p := soundcloudx.NewFromConfig(soundCloudCustomConfig(cfg.SoundCloudCustom)); p != nil {
+			p.SaveArtists = config.SaveSoundCloudXArtists
 			add("soundcloudx", p)
 		}
 	}
